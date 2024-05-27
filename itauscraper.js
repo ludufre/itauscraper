@@ -14,11 +14,12 @@ const stepLogin = async (page, options) => {
   console.log('Homepage loaded.')
   await page.type('#agencia', options.branch)
   await page.type('#conta', options.account)
+  await page.type('#idl-menu-account', options.account)
   console.log('Account and branch number has been filled.')
   await page.waitForTimeout(500)
-  await page.click('.login_button')
+  await page.click('#idl-btn-login-ok')
 
-  if(!!options.name){
+  if (!!options.name) {
     console.log('Opening account holder page...');
     await page.waitForTimeout(2000)
     await stepAwaitRegularLoading(page)
@@ -28,7 +29,7 @@ const stepLogin = async (page, options) => {
     const names = await page.$$('ul.selecao-nome-titular a[role="button"]');
     for (const name of names) {
       const text = await page.evaluate(element => element.textContent, name);
-      if(text.toUpperCase() == options.name.toUpperCase()){
+      if (text.toUpperCase() == options.name.toUpperCase()) {
         name.click();
         console.log('Account holder selected.')
       }
@@ -83,14 +84,28 @@ const stepExport = async (page, options) => {
   console.log('Menu has been closed')
 
   // Select period of days
-  await page.select('cpv-select[model=\'pc.periodoSelecionado\'] select', options.days.toString())
-  console.log('Selected period of days on the filters')
-  await stepAwaitRegularLoading(page)
+  const currentDays = await page.evaluate(() => document.querySelector('#periodoFiltroName').innerText);
+  if (currentDays !== 'últimos ' + options.days.toString() + ' dias') {
+    await page.evaluate((days) => {
+      const items = Array.from(document.querySelectorAll('ul.form-element-group__select-options li'))
+      const item = items.find(el => el.textContent.trim() === 'últimos ' + days + ' dias')
+      if (item) {
+        item.click()
+      }
+    }, options.days.toString())
+
+    console.log('Selected period of days on the filters')
+    await stepAwaitRegularLoading(page)
+  }
 
   // Sort by most  recent transactions first
-  await page.select('cpv-select[model=\'app.ordenacao\'] select', 'maisRecente')
-  console.log('Sorted by most recent transactions first')
-  await stepAwaitRegularLoading(page)
+  const currentOrder = await page.evaluate(() => document.querySelector('#selectidName').innerText);
+  if (currentOrder !== 'mais recente') {
+    await page.evaluate(() => document.querySelector('li[data-id=\'maisRecente\']').click());
+
+    console.log('Sorted by most recent transactions first')
+    await stepAwaitRegularLoading(page)
+  }
 
   // configure Download Trigger
   let triggerDownload = (fileFormat) => { exportarExtratoArquivo('formExportarExtrato', fileFormat) }// eslint-disable-line
@@ -120,13 +135,13 @@ const stepAwaitRegularLoading = async (page) => {
 const stepCloseStatementGuide = async (page) => {
   await page.waitForSelector('.feature-discovery-extrato button.hopscotch-cta', { timeout: 4000 })
     .then(() => page.click('.feature-discovery-extrato button.hopscotch-cta')) // eslint-disable-line
-    .catch(() => {})
+    .catch(() => { })
 }
 
 const stepClosePossiblePopup = async (page) => {
   await page.waitForSelector('div.mfp-wrap', { timeout: 4000 })
     .then(() => page.evaluate(() => popFechar())) // eslint-disable-line
-    .catch(() => {})
+    .catch(() => { })
 }
 
 const mapPasswordKeys = async (page) => {
